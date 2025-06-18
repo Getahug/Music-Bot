@@ -1,8 +1,10 @@
 import { Client, GatewayIntentBits, Collection } from 'discord.js';
-import { token, prefix } from './config.json';
+import config from './config.json' assert { type: "json" };
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const { token, prefix, clientId, guildId } = config;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +19,6 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-
 client.queues = new Map();
 
 const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));

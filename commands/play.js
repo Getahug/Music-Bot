@@ -80,8 +80,13 @@ function playSong(guild, song, client, message) {
         return;
     }
 
-    const stream = ytdl(song.url, { filter: 'audioonly' });
-    const resource = createAudioResource(stream);
+const stream = ytdl(song.url, {
+    filter: 'audioonly',
+    quality: 'highestaudio',
+    highWaterMark: 1 << 25
+});
+
+const resource = createAudioResource(stream);
 
     queue.player.play(resource);
 

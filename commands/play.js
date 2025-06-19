@@ -1,4 +1,4 @@
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import play from 'play-dl';
 import { EmbedBuilder } from 'discord.js';
 
@@ -8,24 +8,19 @@ export async function execute(message, args, client) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) return message.reply('❌ Você precisa estar em um canal de voz!');
 
-    const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions.has('Connect') || !permissions.has('Speak')) {
-        return message.reply('❌ Eu preciso de permissões para entrar e falar no seu canal!');
-    }
+    const songName = args.join(' ');
+    if (!songName) return message.reply('❌ Você precisa fornecer o nome da música.');
 
-    const query = args.join(' ');
-    if (!query) {
-        return message.reply('❌ Você precisa fornecer o nome da música ou link!');
-    }
+    const search = await play.search(songName, { limit: 1 });
+    const video = search[0];
 
-    let search = await play.search(query, { limit: 1 });
-    if (!search || search.length === 0) {
+    if (!video) {
         return message.reply('❌ Música não encontrada.');
     }
 
     const song = {
-        title: search[0].title,
-        url: search[0].url
+        title: video.title,
+        url: video.url
     };
 
     let queue = client.queues.get(message.guild.id);
@@ -40,25 +35,18 @@ export async function execute(message, args, client) {
 
         client.queues.set(message.guild.id, queue);
 
-        try {
-            const connection = joinVoiceChannel({
-                channelId: voiceChannel.id,
-                guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator
-            });
+        const connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: message.guild.id,
+            adapterCreator: message.guild.voiceAdapterCreator
+        });
 
-            queue.connection = connection;
-            connection.subscribe(queue.player);
+        queue.connection = connection;
+        connection.subscribe(queue.player);
 
-            queue.songs.push(song);
-            playSong(message.guild, queue.songs[0], client, message);
+        queue.songs.push(song);
 
-        } catch (err) {
-            console.error(err);
-            client.queues.delete(message.guild.id);
-            return message.reply('❌ Erro ao conectar no canal de voz.');
-        }
-
+        playSong(message.guild, queue.songs[0], client, message);
     } else {
         queue.songs.push(song);
         return message.reply(`✅ **${song.title}** foi adicionada na fila.`);
@@ -81,15 +69,6 @@ async function playSong(guild, song, client, message) {
 
     queue.player.play(resource);
 
-    const embed = new EmbedBuilder()
-        .setColor('Random')
-        .setTitle(`🎶 Tocando agora: ${song.title}`)
-        .setURL(song.url)
-        .setDescription('Aproveite a música!')
-        .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
-
-    message.channel.send({ embeds: [embed] });
-
     queue.player.once(AudioPlayerStatus.Idle, () => {
         queue.songs.shift();
         playSong(guild, queue.songs[0], client, message);
@@ -100,4 +79,13 @@ async function playSong(guild, song, client, message) {
         queue.songs.shift();
         playSong(guild, queue.songs[0], client, message);
     });
+
+    const embed = new EmbedBuilder()
+        .setColor('Random')
+        .setTitle(`🎶 Tocando agora: ${song.title}`)
+        .setURL(song.url)
+        .setDescription('Aproveite a música!')
+        .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
+
+    message.channel.send({ embeds: [embed] });
 }

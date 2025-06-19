@@ -1,5 +1,5 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
-import ytdl from 'ytdl-core';
+import play from 'play-dl';
 import ytSearch from 'yt-search';
 import { EmbedBuilder } from 'discord.js';
 
@@ -17,12 +17,8 @@ export async function execute(message, args, client) {
     const songName = args.join(' ');
     if (!songName) return message.reply('❌ Você precisa fornecer o nome da música.');
 
-    const videoFinder = async (query) => {
-        const videoResult = await ytSearch(query);
-        return (videoResult.videos.length > 0) ? videoResult.videos[0] : null;
-    };
-
-    const video = await videoFinder(songName);
+    const videoResult = await ytSearch(songName);
+    const video = videoResult.videos.length > 0 ? videoResult.videos[0] : null;
 
     if (!video) {
         return message.reply('❌ Música não encontrada.');
@@ -71,7 +67,7 @@ export async function execute(message, args, client) {
     }
 }
 
-function playSong(guild, song, client, message) {
+async function playSong(guild, song, client, message) {
     const queue = client.queues.get(guild.id);
 
     if (!song) {
@@ -80,13 +76,10 @@ function playSong(guild, song, client, message) {
         return;
     }
 
-    const stream = ytdl(song.url, {
-        filter: 'audioonly',
-        quality: 'highestaudio',
-        highWaterMark: 1 << 25
+    const stream = await play.stream(song.url);
+    const resource = createAudioResource(stream.stream, {
+        inputType: stream.type
     });
-
-    const resource = createAudioResource(stream);
 
     queue.player.play(resource);
 
@@ -111,4 +104,3 @@ function playSong(guild, song, client, message) {
 
     message.channel.send({ embeds: [embed] });
 }
-

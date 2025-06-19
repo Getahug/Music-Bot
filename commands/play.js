@@ -1,14 +1,13 @@
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
-import play from 'play-dl';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } from '@discordjs/voice';
+import ytdl from 'ytdl-core';
+import ytSearch from 'yt-search';
 import { EmbedBuilder } from 'discord.js';
 
 export const name = 'play';
 
 export async function execute(message, args, client) {
     const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) {
-        return message.reply('❌ Você precisa estar em um canal de voz!');
-    }
+    if (!voiceChannel) return message.reply('❌ Você precisa estar em um canal de voz!');
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
     if (!permissions.has('Connect') || !permissions.has('Speak')) {
@@ -20,27 +19,31 @@ export async function execute(message, args, client) {
         return message.reply('❌ Você precisa fornecer o nome da música ou link!');
     }
 
-    let songInfo;
+    let song = null;
 
-    try {
-        if (play.yt_validate(query) === 'video') {
-            songInfo = await play.video_info(query);
+    if (ytdl.validateURL(query)) {
+        const songInfo = await ytdl.getInfo(query);
+        song = {
+            title: songInfo.videoDetails.title,
+            url: songInfo.videoDetails.video_url
+        };
+    } else {
+        const videoFinder = async (query) => {
+            const videoResult = await ytSearch(query);
+            return (videoResult.videos.length > 0) ? videoResult.videos[0] : null;
+        };
+
+        const video = await videoFinder(query);
+
+        if (video) {
+            song = {
+                title: video.title,
+                url: video.url
+            };
         } else {
-            const result = await play.search(query, { limit: 1 });
-            if (!result || result.length === 0) {
-                return message.reply('❌ Música não encontrada.');
-            }
-            songInfo = await play.video_info(result[0].url);
+            return message.reply('❌ Música não encontrada.');
         }
-    } catch (error) {
-        console.error(error);
-        return message.reply('❌ Erro ao buscar informações da música.');
     }
-
-    const song = {
-        title: songInfo.video_details.title,
-        url: songInfo.video_details.url
-    };
 
     let queue = client.queues.get(message.guild.id);
 
@@ -79,48 +82,42 @@ export async function execute(message, args, client) {
     }
 }
 
-async function playSong(guild, song, client, message) {
+function playSong(guild, song, client, message) {
     const queue = client.queues.get(guild.id);
 
     if (!song) {
-        if (queue && queue.connection) {
-            queue.connection.destroy();
-        }
+        queue.connection.destroy();
         client.queues.delete(guild.id);
         return;
     }
 
-    try {
-        const stream = await play.stream(song.url);
-        const resource = createAudioResource(stream.stream, {
-            inputType: stream.type
-        });
+    const stream = ytdl(song.url, {
+        filter: 'audioonly',
+        highWaterMark: 1 << 25,
+        quality: 'highestaudio'
+    });
 
-        queue.player.play(resource);
+    const resource = createAudioResource(stream);
 
-        const embed = new EmbedBuilder()
-            .setColor('Random')
-            .setTitle(`🎶 Tocando agora: ${song.title}`)
-            .setURL(song.url)
-            .setThumbnail(songInfo.video_details.thumbnails[0].url)
-            .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
+    queue.player.play(resource);
 
-        message.channel.send({ embeds: [embed] });
+    const embed = new EmbedBuilder()
+        .setColor('Random')
+        .setTitle(`🎶 Tocando agora: ${song.title}`)
+        .setURL(song.url)
+        .setDescription('Aproveite a música!')
+        .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
 
-        queue.player.once(AudioPlayerStatus.Idle, () => {
-            queue.songs.shift();
-            playSong(guild, queue.songs[0], client, message);
-        });
+    message.channel.send({ embeds: [embed] });
 
-        queue.player.on('error', error => {
-            console.error('Erro no player:', error);
-            queue.songs.shift();
-            playSong(guild, queue.songs[0], client, message);
-        });
-
-    } catch (error) {
-        console.error('Erro ao tocar a música:', error);
+    queue.player.once(AudioPlayerStatus.Idle, () => {
         queue.songs.shift();
         playSong(guild, queue.songs[0], client, message);
-    }
+    });
+
+    queue.player.on('error', error => {
+        console.error('Erro no player:', error);
+        queue.songs.shift();
+        playSong(guild, queue.songs[0], client, message);
+    });
 }

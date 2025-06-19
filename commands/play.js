@@ -1,4 +1,5 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import ytdl from 'ytdl-core';
 import ytSearch from 'yt-search';
 import { EmbedBuilder } from 'discord.js';
@@ -80,25 +81,15 @@ function playSong(guild, song, client, message) {
         return;
     }
 
-const stream = ytdl(song.url, {
-    filter: 'audioonly',
-    quality: 'highestaudio',
-    highWaterMark: 1 << 25
-});
+    const stream = ytdl(song.url, {
+        filter: 'audioonly',
+        quality: 'highestaudio',
+        highWaterMark: 1 << 25
+    });
 
-const resource = createAudioResource(stream);
+    const resource = createAudioResource(stream);
 
     queue.player.play(resource);
-
-    const embed = new EmbedBuilder()
-        .setColor('Random')
-        .setTitle(`🎶 Tocando agora: ${song.title}`)
-        .setURL(song.url)
-        .setDescription('Aproveite a música!')
-        .setThumbnail('https://i.ytimg.com/vi/' + song.url.split('v=')[1] + '/hqdefault.jpg')
-        .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
-
-    message.channel.send({ embeds: [embed] });
 
     queue.player.on(AudioPlayerStatus.Idle, () => {
         queue.songs.shift();
@@ -106,8 +97,18 @@ const resource = createAudioResource(stream);
     });
 
     queue.player.on('error', error => {
-        console.error(error);
+        console.error(`Erro no player: ${error.message}`);
         queue.songs.shift();
         playSong(guild, queue.songs[0], client, message);
     });
+
+    const embed = new EmbedBuilder()
+        .setColor('Random')
+        .setTitle(`🎶 Tocando agora: ${song.title}`)
+        .setURL(song.url)
+        .setThumbnail(`https://i.ytimg.com/vi/${song.url.split('v=')[1]}/hqdefault.jpg`)
+        .setDescription('Aproveite a música!')
+        .setFooter({ text: 'Bot Music feito por VOCÊ 😎' });
+
+    message.channel.send({ embeds: [embed] });
 }

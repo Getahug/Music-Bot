@@ -1,10 +1,13 @@
 import { Client, GatewayIntentBits, Collection } from 'discord.js';
-import config from './config.json' assert { type: "json" };
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const { token, prefix, clientId, guildId } = config;
+// 🔥 Pegando as variáveis da Railway (ou do ambiente)
+const token = process.env.TOKEN;
+const prefix = process.env.PREFIX;
+const clientId = process.env.CLIENT_ID;
+const guildId = process.env.GUILD_ID;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

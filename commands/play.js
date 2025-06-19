@@ -1,5 +1,4 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import ytdl from 'ytdl-core';
 import ytSearch from 'yt-search';
 import { EmbedBuilder } from 'discord.js';
@@ -112,3 +111,4 @@ function playSong(guild, song, client, message) {
 
     message.channel.send({ embeds: [embed] });
 }
+

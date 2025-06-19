@@ -1,6 +1,5 @@
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } from '@discordjs/voice';
-import ytdl from 'ytdl-core';
-import ytSearch from 'yt-search';
+import play from 'play-dl';
 import { EmbedBuilder } from 'discord.js';
 
 export const name = 'play';
@@ -19,31 +18,15 @@ export async function execute(message, args, client) {
         return message.reply('❌ Você precisa fornecer o nome da música ou link!');
     }
 
-    let song = null;
-
-    if (ytdl.validateURL(query)) {
-        const songInfo = await ytdl.getInfo(query);
-        song = {
-            title: songInfo.videoDetails.title,
-            url: songInfo.videoDetails.video_url
-        };
-    } else {
-        const videoFinder = async (query) => {
-            const videoResult = await ytSearch(query);
-            return (videoResult.videos.length > 0) ? videoResult.videos[0] : null;
-        };
-
-        const video = await videoFinder(query);
-
-        if (video) {
-            song = {
-                title: video.title,
-                url: video.url
-            };
-        } else {
-            return message.reply('❌ Música não encontrada.');
-        }
+    let search = await play.search(query, { limit: 1 });
+    if (!search || search.length === 0) {
+        return message.reply('❌ Música não encontrada.');
     }
+
+    const song = {
+        title: search[0].title,
+        url: search[0].url
+    };
 
     let queue = client.queues.get(message.guild.id);
 
@@ -82,7 +65,7 @@ export async function execute(message, args, client) {
     }
 }
 
-function playSong(guild, song, client, message) {
+async function playSong(guild, song, client, message) {
     const queue = client.queues.get(guild.id);
 
     if (!song) {
@@ -91,13 +74,10 @@ function playSong(guild, song, client, message) {
         return;
     }
 
-    const stream = ytdl(song.url, {
-        filter: 'audioonly',
-        highWaterMark: 1 << 25,
-        quality: 'highestaudio'
+    const stream = await play.stream(song.url);
+    const resource = createAudioResource(stream.stream, {
+        inputType: stream.type
     });
-
-    const resource = createAudioResource(stream);
 
     queue.player.play(resource);
 
